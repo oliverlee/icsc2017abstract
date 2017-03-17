@@ -1,0 +1,310 @@
+\documentclass{icsc2017a}
+\graphicspath{{fig/}}
+
+\usepackage[
+    font=footnotesize,
+    labelfont=bf
+]{caption}
+\usepackage{siunitx}
+\usepackage{algorithm,algpseudocode}
+\usepackage{pgfplots}
+\usepackage[font=scriptsize]{subcaption}
+
+% give algorithms a refname or else just a number is displayed with autoref
+\newcommand{\algorithmautorefname}{Algorithm}
+% make section start with a capital S
+\renewcommand{\sectionautorefname}{Section}
+
+\pgfplotsset{
+    compat=1.14,
+    every tick label/.append style={font=\tiny},
+    every axis/.append style={
+        font=\scriptsize,
+        xtick pos=left % remove x ticks from top of figure
+    },
+    every axis x label/.append style = {
+        at={(ticklabel cs:0.5,-2)},
+        anchor=center
+    },
+    every axis y label/.append style = {
+        at={(ticklabel cs:0.5,-2)},
+        anchor=center
+    },
+    legend columns=2,
+    legend style={font=\tiny}
+}
+
+% define my url command
+\newcommand{\myurl}[1]{\href{#1}{#1}}
+
+% define common math terms
+\newcommand{\mass}{\bm{M}}
+\newcommand{\damping}{v \bm{C}_1}
+\newcommand{\stiffness}{g \bm{K}_0 + v^2 \bm{K}_2}
+
+% state terms
+\newcommand{\dstate}{\dot{\bm{x}}}
+\newcommand{\state}{\bm{x}}
+\newcommand{\sysInput}{\bm{u}}
+\newcommand{\sysOutput}{y}
+\newcommand{\stateMat}{\bm{A}}
+\newcommand{\inputMat}{\bm{B}}
+\newcommand{\outputMat}{\bm{C}}
+
+% estimate terms
+\newcommand{\dstateEst}{\dot{\hat{\bm{x}}}}
+\newcommand{\stateEst}{\hat{\bm{x}}}
+\newcommand{\meas}{z}
+\newcommand{\processCov}{\bm{Q}}
+\newcommand{\processNoise}{\bm{w}}
+\newcommand{\measCov}{R}
+\newcommand{\measNoise}{v}
+\newcommand{\kalmanGain}{\bm{K}}
+\newcommand{\estimateCov}{\bm{P}}
+
+% coordinates and speeds
+\newcommand{\x}{x_{p}}
+\newcommand{\y}{y_{p}}
+\newcommand{\pitch}{\theta}
+\newcommand{\yaw}{\psi}
+\newcommand{\roll}{\phi}
+\newcommand{\steer}{\delta}
+\newcommand{\dx}{\dot{x}_{p}}
+\newcommand{\dy}{\dot{y}_{p}}
+\newcommand{\pitchRate}{\dot{\theta}}
+\newcommand{\yawRate}{\dot{\psi}}
+\newcommand{\rollRate}{\dot{\phi}}
+\newcommand{\steerRate}{\dot{\delta}}
+\newcommand{\rollAccel}{\ddot{\phi}}
+\newcommand{\steerAccel}{\ddot{\delta}}
+
+% pre/post
+\newcommand{\pre}{-}
+\newcommand{\post}{+}
+
+% virtual/physical
+\newcommand{\virtual}{\rho}
+\newcommand{\physical}{\pi}
+
+\begin{document}
+\begin{flushleft}
+{\fontsize{16pt}{20pt}\selectfont
+    Description of a model based bicycle simulator}
+\end{flushleft}
+\begin{flushleft}
+  {\fontsize{12}{14}{O. Lee, G. Dialynas, J. C. F. de Winter, R. Happee, A. L. Schwab}\\}
+  \textit{Department of BioMechanical Engineering\\
+    Delft University of Technology\\
+    Mekelweg 2, 2628 CD Delft, The Netherlands\\
+    e-mail: \{o.z.lee, g.dialynas, j.c.f.dewinter, r.happee, a.l.schwab\}@tudelft.nl}
+\end{flushleft}
+\section{Introduction}
+Recent years have seen an increase in cycling as a transport mode in urban centers.
+This has spurred an interest in the use of bicycle simulators to study cyclist behavior \cite{caro2015role,
+herpers2008fivis, ohern2017validation, plumert2004childrens}.
+However, few implement a model based approach that couples the bicycle roll and steer in a
+realistic manner \cite{yin2007implementation}.
+Balancing is a key task in cycling and we aimed to develop a simulator that allows us to study the effect of balance on
+the rider's higher level cognitive decisions.
+
+\section{Bicycle model and state estimation}
+\label{sec:model_and_estimator}
+The simulator implements the Whipple bicycle model using the benchmark parameters \cite{meijaard2007linearized}, as it is
+a simple model that has been experimentally verified \cite{kooijman2008experimental}.
+The Whipple model uses linearized equations of motion to describe the bicycle stability in terms of roll angle $\roll$ and
+steer angle $\steer$.
+These equations can be expressed in state space form parameterized by forward speed $v$
+\begin{equation}
+    \dstate = \stateMat{(v)} \state + \inputMat \sysInput \label{eq:state_space}
+\end{equation}
+where $ \dstate = \begin{bmatrix} \yawRate & \rollRate & \steerRate & \rollAccel & \steerAccel \end{bmatrix}^T $,
+$ \state = \begin{bmatrix} \yaw & \roll & \steer& \rollRate & \steerRate \end{bmatrix}^T $,
+$ \sysInput = \begin{bmatrix} T_\roll & T_\steer  \end{bmatrix}^T $, and expressions for $ \stateMat(v) $ and
+$ \inputMat $ can be obtained from \cite{meijaard2007linearized}.
+Note that our formulation extends the state by adding yaw angle $ \yaw $ because yaw rate $ \yawRate $ can be expressed linearly in terms of the state $\state$.
+While roll torque $ T_\roll $ is an input to the system, it is not measured and cannot be applied by the
+rider in our simulator since experiments have shown steer control to be the dominant rider control
+action \cite{moore2011rider}.
+Because the simulator has a fixed base, $\roll$ and $\yaw$ do not physically exist and cannot be measured
+with sensors.
+We treat them as unmeasured states and a Kalman filter is used to obtain an estimate.
+
+\section{Simulator description}
+An image of the fixed base simulator is shown in \autoref{fig:mech}. The physical system consists of a steering shaft,
+the rear half of a bicycle frame, and rollers.
+Reach and stack can be adjusted for a given rider as the steering shaft is telescopic and connected to the frame using
+prismatic joints.
+The steering shaft incorporates a high resolution angular encoder, an inline torque sensor, and an
+electric motor connected in a direct drive configuration.
+A lower resolution angular encoder measures rear wheel position and is used to estimate $v$.
+
+The simulation of the bicycle model and state estimator are implemented in a microcontroller that runs an update loop at
+a rate of \SI{1}{\kilo\hertz}.
+Because the bicycle itself is visualized in our simulator, and the expressions for the rear wheel position coordinates
+$\x$, $\y$ are nonlinear, explicit integration is used to obtain an extended state
+$\bm{x}_e = \begin{bmatrix} \x & \y & \yaw & \roll & \steer & \rollRate & \steerRate \end{bmatrix}^T$.
+
+A pose object $\left( \x, \y, \pitch, \yaw, \roll, \steer \right)$ describing the configuration of the virtual bicycle
+is transmitted to the visual environment at a rate of \SI{120}{\hertz}.
+The pose values are set using the most recently computed $\bm{x}_e$, except the rear frame pitch angle $\pitch$, which is computed
+using the Newton-Raphson method just prior to transmission.
+
+The Unity game engine is used to render the virtual bicycle in the visual environment.
+The engine supports output to a standard monitor, multiple monitors, or a head mounted display (e.g. Oculus Rift).
+An example environment is shown in \autoref{fig:env}.
+
+\begin{figure}
+\centering
+\begin{minipage}[t]{0.45\textwidth}
+    \centering
+    \captionsetup{width=\linewidth}
+    \includegraphics[height=4.5cm]{DSC_6750.jpg}
+    \caption{Delft fixed base bicycle simulator with model based haptic feedback torque}
+    \label{fig:mech}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.45\textwidth}
+    \centering
+    \captionsetup{width=\linewidth}
+    \includegraphics[height=4.5cm]{unity_env.png}
+    \caption{Screenshot of the bicycle simulator visual environment rendered by Unity}
+    \label{fig:env}
+\end{minipage}
+\end{figure}
+
+\section{Virtual dynamics}
+The simulator has a fixed base and as stated in \autoref{sec:model_and_estimator}, roll angle $\roll$ is purely
+virtual, as are $\x$, $\y$, $\pitch$, and $\yaw$, although the latter four do not affect the bicycle steer dynamics.
+All these pure virtual states are presented to the rider only through visualization.
+However, steer angle $\delta$ is both virtual and physical.
+It is displayed in the visual environment and realized by the handlebars in the physical environment and must be
+synchronized between the two environments.
+This is handled using admittance control to impose the steer dynamics of the virtual bicycle on the physical steering
+assembly.
+
+We specify that a term represents a physical value with the subscript postfix $_\physical$ and a virtual value
+with $_\virtual$, when explicitness is necessary.
+For virtual terms, we also optionally use the superscript $^\pre$ to denote the value during the simulation loop
+before a sensor and Kalman update and the superscript $^\post$ to denote the value after the sensor and Kalman
+update.
+
+The physical torque applied by a rider must be virtualized to the steer torque $T_{\steer,\virtual}$ used as input
+to the Whipple model as the inertia of the bicycle handlebars, bicycle stem, and steering shaft above the torque
+sensor will affect the torque sensor measurement.
+We use the term \emph{upper assembly} to denote these components as a group.
+
+Assuming that friction can be neglected, the dynamics of the upper assembly are described by
+\begin{equation}
+    T_{\steer,\virtual} + T_{S,\virtual} = I_{\steer_u} \steerAccel_\virtual \label{eq:eom_upper_assem}
+\end{equation}
+where $ I_{\steer_u}$ is the moment of inertia of the upper assembly about the steer axis,
+$T_{S,\virtual}$ is the sensor torque measurement which we take to be equal to $T_{S,\physical}$,
+$T_{\steer,\virtual}$ is the rider applied steer torque,
+and $\steerAccel_\virtual$ is the steer acceleration.
+
+The calculation of virtual steer torque $T_{\steer,\virtual}$ occurs at the beginning of the simulation loop allowing us
+to use $\stateEst_\virtual$ and $v$ updated in the previous iteration, denoted with $^{\pre}$.
+Using \autoref{eq:eom_upper_assem} and the Whipple model to obtain $\steerAccel$, we calculate $T_{\steer,\virtual}$ as
+\begin{equation}
+    T_{\steer,\virtual} = I_{\steer_u,\virtual} \steerAccel_\virtual^\pre - T_{S,\physical} \label{eq:eom_upper_assem_virtual}
+\end{equation}
+where
+\begin{equation}
+    \steerAccel_\virtual^\pre = \begin{bmatrix} 0 & 0 & 0 & 0 & 1 \end{bmatrix}
+    \stateMat{( v_\virtual^\pre)} \stateEst_\virtual^\pre \label{eq:steer_accel_virtual_pre}
+\end{equation}
+With steer torque calculated in \autoref{eq:eom_upper_assem_virtual}, we obtain the input vector
+$\sysInput_\virtual = \begin{bmatrix} T_{\roll,\virtual} & T_{\steer,\virtual} \end{bmatrix}^T$.
+In the current implementation, we set $T_{\roll,\virtual} = 0$ because we do not simulate any external roll torques.
+An update of the Kalman filter returns an updated state estimate $\stateEst^\post_\virtual$, which contains the desired
+velocity of the steering assembly $\steerRate^\post_\virtual$.
+\begin{equation}
+\begin{aligned}
+\label{eq:kalman_update}
+    \stateEst^{\post|\pre}_\virtual &= \stateMat_d{(v^\post_\virtual)} \stateEst^\pre_\virtual + \inputMat_d \sysInput_\virtual\\
+    \stateEst^\post_\virtual &= \stateEst^{\post|\pre}_\virtual + \bm{K}(
+            \begin{bmatrix} \yaw^\pre_\virtual \\ \steer_\physical \end{bmatrix} -
+                \outputMat \stateEst^{\post|\pre}_\virtual)
+\end{aligned}
+\end{equation}
+where $\stateEst^{\post|\pre}_\virtual$ is the \emph{a priori} state estimate,
+$\stateMat_d, \inputMat_d$ are the discretized state and input matrices that can be obtained from \autoref{eq:state_space},
+$\bm{K}$ is the optimal Kalman gain,
+$\outputMat$ simply returns the $\yaw$ and $\steer$ terms of $\state$,
+and we simply use the last calculated value as a measurement for $\yaw$ because there is no physical sensor associated
+with this coordinate.
+Admittance control is used as we impose $\steerRate^\post_\virtual$ by commanding the motor in velocity mode;
+the motor drive determines the feedback torque to apply given the velocity reference.
+
+The implementation of the equations in this section is presented as pseudocode in \autoref{alg:simulation_iteration}
+and is also available \href{%
+https://github.com/oliverlee/phobos%
+}{online} \cite{lee2017}.\\
+\begin{algorithm}[H]
+\caption{Simulation time step iteration}
+\label{alg:simulation_iteration}
+\begin{algorithmic}[1]
+    \State $v^\pre_\virtual \leftarrow v^\post_\virtual$
+    \State $\stateEst^\pre_\virtual \leftarrow \stateEst^\post_\virtual$
+    \State measure $T_{S,\physical}, \steer_\physical, v_\physical$
+    \State compute $T_{\steer,\virtual}$ using $T_{S,\physical}, v^\pre_\virtual, \stateEst^\pre_\virtual$
+        \Comment{\autoref{eq:eom_upper_assem_virtual} and \autoref{eq:steer_accel_virtual_pre}}
+    \State $\sysInput_\virtual \leftarrow \begin{bmatrix} 0 & T_{\steer,\virtual}\end{bmatrix}^T$
+    \State $v^\post_\virtual \leftarrow v_{\physical}$
+    \State compute $\stateEst^\post_\virtual, \steerRate^\post_\virtual$ using $v^\post_\virtual, \stateEst^\pre_\virtual, \sysInput_\virtual, \steer_\physical$
+        \Comment{\autoref{eq:kalman_update}}
+    \State apply $ T_{M,\physical} $
+    \State apply $\steerRate^\post_\virtual$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Preliminary results}
+
+\begin{figure}
+\centering
+\begin{subfigure}{0.45\textwidth}
+    \centering
+    \captionsetup{width=\linewidth}
+    \input{fig/state_plot_phobos.tex}
+    \caption{Bicycle simulator}
+    \label{fig:state_ph}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.45\textwidth}
+    \centering
+    \captionsetup{width=\linewidth}
+    \input{fig/state_plot_whipple.tex}
+    \caption{Whipple simulation}
+    \label{fig:state_py}
+\end{subfigure}
+\caption[alt-caption]{Time series plots of the Whipple model state, excluding $\yaw$, for the bicycle simulator
+    (\ref{fig:state_ph}) and a simulation of the Whipple model (\ref{fig:state_py}).
+    The model velocity is set to $v = \SI{5.0}{\meter\per\second}$ which lies in the stable speed range.
+    Initial state is set to $\state_0 = \begin{bmatrix}
+        \SI{22.72}{\degree} & \SI{13.15}{\degree} & \SI{29.94}{\degree\per\second} & \SI{42.86}{\degree\per\second}
+    \end{bmatrix}$ and $T_{\steer} = 0
+    \enskip \forall \enskip t$.
+    Both \ref{fig:state_ph} and \ref{fig:state_py} show that all states converge to zero.}
+\label{fig:test}
+\end{figure}
+
+The bicycle simulator is still under development.
+However, initial tests show behavior subjectively resembles the Whipple model.
+The results of a test are shown in \autoref{fig:state_ph} for the bicycle simulator running at a constant
+$v = \SI[per-mode=symbol]{5.0}{\meter\per\second}$ with $T_{\steer} = 0$ and an arbitrarily chosen initial condition
+$\state_0$.
+A simulation of the Whipple model with the same $v, T_\steer, \state_0$ is shown in \autoref{fig:state_py} and we
+\href{https://youtu.be/ekhSaXHQY9w}{observe} similar damped oscillating behavior in both cases.
+Next steps involve studying balance behavior for a small group of participants given the observed realistic steering
+dynamics, and therefore, realistic handlebar haptic feedback.
+
+\section{Acknowledgements}
+
+We gratefully acknowledge the European Commission for their support of the Marie Curie Initial Training Network (ITN)
+project Nr. 608092 MOTORIST (Motorcycle Rider Integrated Safety),
+\mbox{\href{http://www.motorist-ptw.eu}{www.motorist-ptw.eu}}.
+
+\footnotesize\bibliography{references.bib}
+\bibliographystyle{IEEEtran}
+
+\end{document}
