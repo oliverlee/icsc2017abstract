@@ -1,4 +1,4 @@
-\documentclass{icsc2017a}
+\documentclass{icsc}
 \graphicspath{{fig/}}
 
 \usepackage[
@@ -87,17 +87,32 @@
 \newcommand{\physical}{\pi}
 
 \begin{document}
-\begin{flushleft}
-{\fontsize{16pt}{20pt}\selectfont
-    Description of a model based bicycle simulator}
-\end{flushleft}
-\begin{flushleft}
-  {\fontsize{12}{14}{O. Lee, G. Dialynas, J. C. F. de Winter, R. Happee, A. L. Schwab}\\}
-  \textit{Department of BioMechanical Engineering\\
-    Delft University of Technology\\
-    Mekelweg 2, 2628 CD Delft, The Netherlands\\
-    e-mail: \{o.z.lee, g.dialynas, j.c.f.dewinter, r.happee, a.l.schwab\}@tudelft.nl}
-\end{flushleft}
+
+% title
+\begin{center}
+  \fontsize{14}{20}{\bf Description of a model based bicycle simulator}
+\end{center}
+
+% authors
+\begin{center}
+    \normalsize{\bf{O. Lee, G. Dialynas, J. C. F. de Winter, R. Happee, A. L. Schwab}}
+\end{center}
+
+% contact
+\begin{center}
+  \begin{tabular}{c}
+     Department of BioMechanical Engineering\\
+     Delft University of Technology\\
+     Mekelweg 2, NL-2628~CD~~Delft, The Netherlands\\
+     e-mail: \{o.z.lee, g.dialynas, j.c.f.dewinter, r.happee, a.l.schwab\}@tudelft.nl\\
+  \end{tabular}
+\end{center}
+
+% keywords
+\begin{keywords}
+bicycle dynamics, haptics, simulators.
+\end{keywords}
+
 \section{Introduction}
 Recent years have seen an increase in cycling as a transport mode in urban centers.
 This has spurred an interest in the use of bicycle simulators to study cyclist behavior \cite{caro2015role,
@@ -191,7 +206,7 @@ update.
 The physical torque applied by a rider must be virtualized to the steer torque $T_{\steer,\virtual}$ used as input
 to the Whipple model as the inertia of the bicycle handlebars, bicycle stem, and steering shaft above the torque
 sensor will affect the torque sensor measurement.
-We use the term \emph{upper assembly} to denote these components as a group.
+We use the term \textit{upper assembly} to denote these components as a group.
 
 Assuming that friction can be neglected, the dynamics of the upper assembly are described by
 \begin{equation}
@@ -237,9 +252,7 @@ Admittance control is used as we impose $\steerRate^\post_\virtual$ by commandin
 the motor drive determines the feedback torque to apply given the velocity reference.
 
 The implementation of the equations in this section is presented as pseudocode in \autoref{alg:simulation_iteration}
-and is also available \href{%
-https://github.com/oliverlee/phobos%
-}{online} \cite{lee2017}.\\
+and is also available online \cite{lee2017}.\\
 \begin{algorithm}[H]
 \caption{Simulation time step iteration}
 \label{alg:simulation_iteration}
