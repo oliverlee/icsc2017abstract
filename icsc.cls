@@ -161,8 +161,7 @@
 \newcommand{\ts}{\textsuperscript}
 
 \AtBeginDocument{%
-  \pagestyle{plain}
-  \thispagestyle{fancy}
+  \pagestyle{fancy}
   \fancyhf{} % clear all header and footer fields
   \renewcommand{\headrulewidth}{0pt}
   \lhead{\raisebox{0.75\height}{\includegraphics[width=2.34in]{conference-logo}}}
@@ -170,6 +169,6 @@
     21--22 September 2017, Davis, California, USA\vspace{5mm}}}%
   \lfoot{\centering\scriptsize{This work is licensed under the Creative Commons Attribution 4.0
     Unported License. To view a copy of this license, visit
-    \url{http://creativecommons.org/licenses/by/4.0/.}}}
+    \url{http://creativecommons.org/licenses/by/4.0/.}}\\ \thepage}
 }
 \endinput
